@@ -1,0 +1,72 @@
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
+from sklearn.metrics import classification_report, accuracy_score
+from sklearn.preprocessing import LabelEncoder
+
+# Read the Excel file (Note to modify it to your actual path)
+file_path = "C:/Users/1/Desktop/PCA结果.xlsx"
+df = pd.read_excel(file_path)
+
+# Convert the grouping column to a numeric label
+le = LabelEncoder()
+df['Group'] = le.fit_transform(df['Group'])
+
+# Suppose column A is the label, and columns B to G are features
+X = df.iloc[:, 1:7]  # Feature columns B to G (columns 2 to 7)
+y = df['Group']       # Label column A (Group column)
+
+# Split into training and test sets
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.2,
+    random_state=42
+)
+
+# Create a logistic regression classifier (Set a larger max_iter to ensure convergence)
+logreg = LogisticRegression(max_iter=5000, random_state=42)
+
+# Define the parameter grid
+param_grid = {
+    'C': [0.001, 0.01, 0.1, 1, 10, 100],  # The reciprocal of regularization strength
+    'penalty': ['l1', 'l2'],                # Type of regularization
+    'solver': ['liblinear', 'saga']         # Optimization algorithm (supports both L1/L2)
+}
+
+# Create a stratified K-fold cross-validation object (three folds)
+stratified_cv = StratifiedKFold(
+    n_splits=3,          # Modify to 3 folds
+    shuffle=True,
+    random_state=42
+)
+
+# Create a grid search object
+grid_search = GridSearchCV(
+    estimator=logreg,
+    param_grid=param_grid,
+    cv=stratified_cv,    # Use three-fold cross-validation
+    scoring='accuracy',
+    n_jobs=-1,           # Use all CPU cores
+    verbose=1            # Output progress
+)
+
+# Perform grid search
+grid_search.fit(X_train, y_train)
+
+# Output the best parameter combination and cross-validation results
+print("\nBest parameter combination:", grid_search.best_params_)
+print("Cross-validation best accuracy: {:.4f}".format(grid_search.best_score_))
+
+# Use the best model to make predictions on the test set
+best_model = grid_search.best_estimator_
+y_pred = best_model.predict(X_test)
+
+# Evaluate the test set performance
+print("\nTest set accuracy: {:.4f}".format(accuracy_score(y_test, y_pred)))
+print("Test set classification report:\n", classification_report(y_test, y_pred))
+
+# Optionally: Output the cross-validation results for all parameter combinations
+results_df = pd.DataFrame(grid_search.cv_results_)
+print("\nCross-validation results for all parameter combinations:")
+print(results_df[['params', 'mean_test_score', 'std_test_score']])

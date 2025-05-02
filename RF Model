@@ -1,0 +1,57 @@
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
+from sklearn.metrics import classification_report, accuracy_score
+
+# Read the Excel file
+df = pd.read_excel("C:/Users/1/Desktop/PCA结果.xlsx")
+
+# Process data, convert the grouping column to a numeric label
+df['Group'] = df['Group'].map({'COPD': 0, 'PI': 1})
+
+# Suppose column A is the label, and columns B to G are features
+X = df.iloc[:, 1:7]  # Feature columns B to G
+y = df['Group']      # Label column A
+
+# Split into training and test sets (keep the original split for final evaluation)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Create a stratified K-fold cross-validation object (3 folds)
+cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
+
+# Define the parameter grid
+param_grid = {
+    'n_estimators': [50, 100, 200],
+    'max_depth': [None, 5, 10],
+    'min_samples_split': [2, 5],
+    'min_samples_leaf': [1, 2]
+}
+
+# Create a random forest classifier
+rf = RandomForestClassifier(random_state=42)
+
+# Create a grid search object
+grid_search = GridSearchCV(
+    estimator=rf,
+    param_grid=param_grid,
+    cv=cv,
+    scoring='accuracy',  # You can modify the evaluation metric as needed
+    n_jobs=-1,  # Use all available CPU cores
+    verbose=1
+)
+
+# Perform grid search
+grid_search.fit(X_train, y_train)
+
+# Output the best parameters and score
+print("Best Parameters:", grid_search.best_params_)
+print("Best Cross-validation Score: {:.4f}".format(grid_search.best_score_))
+
+# Evaluate the test set using the best model
+best_rf = grid_search.best_estimator_
+y_pred = best_rf.predict(X_test)
+
+# Final evaluation results
+print("\nTest Set Evaluation:")
+print("Accuracy: {:.4f}".format(accuracy_score(y_test, y_pred)))
+print("Classification Report:\n", classification_report(y_test, y_pred))
